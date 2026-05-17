@@ -72,8 +72,10 @@ function transformToPortalData(brand, tokens, pages, assets) {
   const pagesBySlug = Object.fromEntries(pages.map(p => [p.slug, p]));
 
   // Agrupar assets por (category, name) com seus formatos
+  // Pula 'system' (recursos internos do portal, como o logo do header)
   const groupsMap = new Map();
   for (const a of assets) {
+    if (a.category === "system") continue;
     const key = `${a.category}::${a.name}`;
     if (!groupsMap.has(key)) {
       groupsMap.set(key, {
@@ -350,7 +352,7 @@ function BrandPortal({ data }) {
           display: "flex", alignItems: "center", justifyContent: "space-between",
         }}>
           {data.primaryLogoUrl && (
-            <img src={data.primaryLogoUrl} alt={data.name} style={{ height: 22, width: "auto", display: "block" }} />
+            <img src={data.primaryLogoUrl} alt={data.name} style={{ height: 32, width: "auto", display: "block" }} />
           )}
           <nav style={{ display: "flex", gap: "2.25rem", alignItems: "center" }}>
             {pages.map(p => (
@@ -383,7 +385,7 @@ function BrandPortal({ data }) {
         </div>
         {data.primaryLogoUrl && (
           <img src={data.primaryLogoUrl} alt={data.name} style={{
-            height: "clamp(60px, 9vw, 110px)", width: "auto", display: "block", marginBottom: "2.5rem",
+            height: "clamp(50px, 6vw, 85px)", width: "auto", display: "block", marginBottom: "2.5rem",
           }} />
         )}
         <p style={{
@@ -525,7 +527,7 @@ function BrandPortal({ data }) {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             {data.primaryLogoUrl && (
-              <img src={data.primaryLogoUrl} alt={data.name} style={{ height: 18 }} />
+              <img src={data.primaryLogoUrl} alt={data.name} style={{ height: 24 }} />
             )}
             <span style={{ width: 1, height: 14, background: "#EFEFEF" }} />
             <span style={{ fontSize: "0.75rem", color: "#59595B", letterSpacing: "0.04em" }}>
