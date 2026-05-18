@@ -569,24 +569,32 @@ function LogoOnBackgrounds({ assetGroups }) {
   );
 }
 
-// 2. Margem de respiro — hachura na área de proteção, cubo como módulo virtual
+// 2. Margem de respiro — hachura externa = "fora", branco = margem, cubos = módulo X
 function ClearSpace({ assetGroups, primaryLogoUrl }) {
   const cubeUrl = findLogoFile(assetGroups, "Símbolo (Cubo)");
 
-  // Hachura diagonal sutil para representar a área de proteção
+  // Hachura diagonal sutil para representar a superfície externa (qualquer ambiente de aplicação)
   const hatchBg = `repeating-linear-gradient(
     -45deg,
-    rgba(0, 0, 0, 0.18),
-    rgba(0, 0, 0, 0.18) 1px,
+    rgba(0, 0, 0, 0.22),
+    rgba(0, 0, 0, 0.22) 1px,
     transparent 1px,
     transparent 7px
   )`;
 
   const xMarker = {
     position: "absolute",
-    fontFamily: "'Sora', sans-serif", fontSize: "0.7rem", fontWeight: 500,
-    color: "#000", fontStyle: "italic", background: "#FFF", padding: "0 4px",
+    fontFamily: "'Sora', sans-serif", fontSize: "0.75rem", fontWeight: 500,
+    color: "#000", fontStyle: "italic", background: "#FFF", padding: "0 5px",
+    zIndex: 3,
   };
+
+  const guideLine = (orientation) => ({
+    position: "absolute",
+    background: "#000",
+    ...(orientation === "vertical" ? { width: 1 } : { height: 1 }),
+    zIndex: 2,
+  });
 
   return (
     <div>
@@ -596,37 +604,70 @@ function ClearSpace({ assetGroups, primaryLogoUrl }) {
         gap: "3rem", alignItems: "center",
         marginBottom: "2rem",
       }}>
-        {/* Diagrama com hachura */}
+        {/* Container externo: hachura representa a superfície de aplicação */}
         <div style={{
           position: "relative", width: "100%",
           aspectRatio: "16 / 8",
           backgroundImage: hatchBg,
-          border: "1px solid #BBB",
-          minHeight: 280,
+          minHeight: 320,
         }}>
-          {/* Área interna branca (safe area do logo) */}
+          {/* Caixa branca = margem de respiro propriamente dita */}
           <div style={{
             position: "absolute",
-            top: "22%", bottom: "22%", left: "14%", right: "14%",
+            top: "8%", bottom: "8%", left: "6%", right: "6%",
             background: "#FFF",
             display: "flex", alignItems: "center", justifyContent: "center",
-            padding: "1.5rem",
           }}>
+            {/* Cubos fantasmas — preenchem visualmente cada margem (X = altura do cubo) */}
+            {cubeUrl && (
+              <>
+                <img src={cubeUrl} alt="" aria-hidden style={{
+                  position: "absolute", top: "8%", left: "50%", transform: "translateX(-50%)",
+                  height: "26%", opacity: 0.22, zIndex: 1, pointerEvents: "none",
+                }} />
+                <img src={cubeUrl} alt="" aria-hidden style={{
+                  position: "absolute", bottom: "8%", left: "50%", transform: "translateX(-50%)",
+                  height: "26%", opacity: 0.22, zIndex: 1, pointerEvents: "none",
+                }} />
+                <img src={cubeUrl} alt="" aria-hidden style={{
+                  position: "absolute", left: "4%", top: "50%", transform: "translateY(-50%)",
+                  height: "32%", opacity: 0.22, zIndex: 1, pointerEvents: "none",
+                }} />
+                <img src={cubeUrl} alt="" aria-hidden style={{
+                  position: "absolute", right: "4%", top: "50%", transform: "translateY(-50%)",
+                  height: "32%", opacity: 0.22, zIndex: 1, pointerEvents: "none",
+                }} />
+              </>
+            )}
+
+            {/* Logo principal no centro */}
             {primaryLogoUrl && (
               <img src={primaryLogoUrl} alt="Logo com margem de respiro" style={{
-                maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block",
+                height: "42%", maxWidth: "55%", objectFit: "contain",
+                display: "block", position: "relative", zIndex: 2,
               }} />
             )}
-          </div>
 
-          {/* Marcadores X — um em cada uma das 4 margens */}
-          <span style={{ ...xMarker, top: "11%", left: "50%", transform: "translate(-50%, -50%)" }}>x</span>
-          <span style={{ ...xMarker, bottom: "11%", left: "50%", transform: "translate(-50%, 50%)" }}>x</span>
-          <span style={{ ...xMarker, top: "50%", left: "7%", transform: "translate(-50%, -50%)" }}>x</span>
-          <span style={{ ...xMarker, top: "50%", right: "7%", transform: "translate(50%, -50%)" }}>x</span>
+            {/* Linhas guia + marcadores X — uma em cada lado, indicando a medida da margem */}
+            {/* Topo: linha vertical do topo da caixa branca até o topo do logo */}
+            <div style={{ ...guideLine("vertical"), top: 0, bottom: "71%", left: "62%" }} />
+            <span style={{ ...xMarker, top: "12%", left: "62%", transform: "translate(-50%, -50%)" }}>x</span>
+
+            {/* Base: linha vertical da base do logo até a base da caixa branca */}
+            <div style={{ ...guideLine("vertical"), top: "71%", bottom: 0, left: "62%" }} />
+            <span style={{ ...xMarker, top: "88%", left: "62%", transform: "translate(-50%, -50%)" }}>x</span>
+
+            {/* Esquerda: linha horizontal da esquerda da caixa branca até a esquerda do logo */}
+            <div style={{ ...guideLine("horizontal"), left: 0, right: "78%", top: "50%" }} />
+            <span style={{ ...xMarker, top: "50%", left: "11%", transform: "translate(-50%, -50%)" }}>x</span>
+
+            {/* Direita: linha horizontal da direita do logo até a direita da caixa branca */}
+            <div style={{ ...guideLine("horizontal"), left: "78%", right: 0, top: "50%" }} />
+            <span style={{ ...xMarker, top: "50%", right: "11%", transform: "translate(50%, -50%)" }}>x</span>
+          </div>
         </div>
 
-        {/* Legenda X = cubo */}
+        {/* Legenda lateral: X = cubo */}
         <div style={{
           display: "flex", alignItems: "center", gap: "1rem",
           padding: "1rem 1.25rem",
