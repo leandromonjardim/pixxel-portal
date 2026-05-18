@@ -160,6 +160,62 @@ function SectionNumber({ n, children }) {
   );
 }
 
+// Variante: intro + seções `## ` lado a lado em duas colunas (usado em Bastidores)
+function MarkdownTwoColumns({ source }) {
+  if (!source) return null;
+
+  // Divide o markdown no primeiro `## `
+  const firstH2 = source.indexOf("\n## ");
+  let intro, sectionsRaw;
+  if (firstH2 === -1) {
+    intro = source.trim();
+    sectionsRaw = "";
+  } else {
+    intro = source.slice(0, firstH2).trim();
+    sectionsRaw = source.slice(firstH2 + 1).trim();
+  }
+
+  // Quebra as seções por `## `
+  const sections = sectionsRaw
+    .split(/\n## /)
+    .filter(Boolean)
+    .map(s => {
+      const lines = s.replace(/^## /, "").split("\n");
+      const title = lines[0].trim();
+      const body = lines.slice(1).join("\n").trim();
+      return { title, body };
+    });
+
+  return (
+    <div>
+      {intro && (
+        <div style={{ marginBottom: "3.5rem" }}>
+          <MarkdownContent source={intro} maxWidth={800} />
+        </div>
+      )}
+      {sections.length > 0 && (
+        <div style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+          gap: "3rem",
+          paddingTop: "2rem",
+          borderTop: "1px solid #EFEFEF",
+        }}>
+          {sections.map((s, i) => (
+            <div key={i}>
+              <h3 style={{
+                fontSize: "1.15rem", fontWeight: 600, letterSpacing: "-0.02em",
+                margin: "0 0 1.25rem 0", color: "#000",
+              }}>{s.title}</h3>
+              <MarkdownContent source={s.body} maxWidth={null} />
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Extrai apenas a seção "## Golden Circle" do markdown da Visão
 // (os direcionadores são renderizados como cards visuais separadamente)
 function extractGoldenCircle(md) {
@@ -204,9 +260,13 @@ function MarkdownContent({ source, maxWidth = 760 }) {
         if (trimmed.startsWith("### ")) {
           return (
             <h3 key={i} style={{
-              fontSize: "1.05rem", fontWeight: 600, letterSpacing: "-0.01em",
-              margin: "2rem 0 0.75rem 0", color: "#000",
-            }}>{inline(trimmed.slice(4))}</h3>
+              fontSize: "1.1rem", fontWeight: 600, letterSpacing: "-0.01em",
+              margin: "2.5rem 0 0.85rem 0", color: "#000",
+              display: "flex", alignItems: "center", gap: "0.85rem",
+            }}>
+              <span style={{ width: 28, height: 2, background: "#00E37A", flexShrink: 0 }} />
+              <span>{inline(trimmed.slice(4))}</span>
+            </h3>
           );
         }
         if (trimmed.startsWith("## ")) {
@@ -494,9 +554,9 @@ function LogoOnBackgrounds({ assetGroups }) {
             <div style={{
               height: 180, background: bg,
               display: "flex", alignItems: "center", justifyContent: "center",
-              borderBottom: "1px solid #EFEFEF",
+              borderBottom: "1px solid #EFEFEF", padding: "1.25rem",
             }}>
-              {url && <img src={url} alt={item.name} style={{ maxWidth: "70%", maxHeight: 100, objectFit: "contain" }} />}
+              {url && <img src={url} alt={item.name} style={{ maxWidth: "92%", maxHeight: 130, objectFit: "contain" }} />}
             </div>
             <div style={{ padding: "1rem 1.25rem" }}>
               <div style={{ fontWeight: 600, fontSize: "0.9rem", marginBottom: "0.25rem" }}>{item.name}</div>
@@ -509,50 +569,56 @@ function LogoOnBackgrounds({ assetGroups }) {
   );
 }
 
-// 2. Margem de respiro com guias visuais
-function ClearSpace({ assetGroups }) {
-  const url = findLogoFile(assetGroups, "Logo Positivo");
+// 2. Margem de respiro com o cubo como módulo virtual de referência
+function ClearSpace({ assetGroups, primaryLogoUrl }) {
+  const cubeUrl = findLogoFile(assetGroups, "Símbolo (Cubo)");
+
   return (
     <div>
       <div style={{
-        padding: "3rem", background: "#FAFAFA", border: "1px solid #EFEFEF",
-        display: "flex", alignItems: "center", justifyContent: "center", marginBottom: "1.5rem",
+        padding: "4rem 3rem", background: "#FAFAFA", border: "1px solid #EFEFEF",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        marginBottom: "1.5rem",
       }}>
         <div style={{
-          position: "relative", padding: "60px 60px",
-          border: "1px dashed #00E37A", display: "inline-flex",
+          position: "relative", padding: "70px 90px",
+          border: "1px dashed rgba(0, 227, 122, 0.6)",
+          display: "inline-flex", alignItems: "center", justifyContent: "center",
         }}>
-          {/* indicadores de margem nos 4 cantos */}
-          {[
-            { top: 8, left: 8 }, { top: 8, right: 8 },
-            { bottom: 8, left: 8 }, { bottom: 8, right: 8 },
+          {/* Cubo módulo nos 4 cantos da borda — referência virtual de margem */}
+          {cubeUrl && [
+            { top: -28, left: -28 },
+            { top: -28, right: -28 },
+            { bottom: -28, left: -28 },
+            { bottom: -28, right: -28 },
           ].map((pos, i) => (
-            <div key={i} style={{
-              position: "absolute", ...pos,
-              fontSize: "0.55rem", fontWeight: 600, letterSpacing: "0.1em",
-              color: "#00E37A", textTransform: "uppercase",
-            }}>x</div>
+            <img key={i} src={cubeUrl} alt="módulo" style={{
+              position: "absolute", ...pos, width: 56, height: 56, objectFit: "contain",
+              opacity: 0.85,
+            }} />
           ))}
-          {url && <img src={url} alt="Logo com margem de respiro" style={{ height: 60, display: "block" }} />}
+          {/* Logo principal no centro */}
+          {primaryLogoUrl && <img src={primaryLogoUrl} alt="Logo" style={{
+            height: 90, display: "block",
+          }} />}
         </div>
       </div>
-      <p style={{ fontSize: "0.95rem", color: "#000", lineHeight: 1.6, maxWidth: 720, margin: 0 }}>
-        A marca precisa de espaço ao redor, livre de interferência de outros elementos gráficos como textos,
-        fotos ou outras marcas. Use a <strong>altura da letra</strong> como módulo de referência para a margem
-        mínima — quanto maior a aplicação, maior a margem proporcional. A regra se aplica a todas as
-        variações da assinatura visual.
+      <p style={{ fontSize: "0.95rem", color: "#000", lineHeight: 1.65, maxWidth: 760, margin: 0 }}>
+        A marca precisa de espaço ao redor, livre de interferência de outros elementos gráficos
+        como textos, fotos ou outras marcas. Use o <strong>símbolo do cubo</strong> como módulo virtual
+        de referência — a margem mínima deve corresponder, no mínimo, à <strong>altura de um cubo</strong>
+        em cada um dos quatro lados. A regra é proporcional: quanto maior a aplicação, maior a margem.
       </p>
     </div>
   );
 }
 
 // 3. Redução mínima — tamanhos para diferentes meios
-function MinSize({ assetGroups }) {
-  const url = findLogoFile(assetGroups, "Logo Positivo");
+function MinSize({ primaryLogoUrl }) {
   const sizes = [
-    { label: "Digital",          value: "24px", desc: "Altura mínima em telas",         height: 24 },
-    { label: "Impresso pequeno", value: "15mm", desc: "Cartões, etiquetas, brindes",    height: 57 },
-    { label: "Impresso grande",  value: "30mm", desc: "Materiais institucionais",       height: 113 },
+    { label: "Digital",          value: "48px", desc: "Altura mínima em telas",         height: 48 },
+    { label: "Impresso pequeno", value: "15mm", desc: "Cartões, etiquetas, brindes",    height: 64 },
+    { label: "Impresso grande",  value: "30mm", desc: "Materiais institucionais",       height: 96 },
   ];
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem" }}>
@@ -562,7 +628,7 @@ function MinSize({ assetGroups }) {
             minHeight: 180, padding: "2rem", display: "flex",
             alignItems: "center", justifyContent: "center", borderBottom: "1px solid #EFEFEF",
           }}>
-            {url && <img src={url} alt={s.label} style={{ height: s.height, display: "block" }} />}
+            {primaryLogoUrl && <img src={primaryLogoUrl} alt={s.label} style={{ height: s.height, display: "block" }} />}
           </div>
           <div style={{ padding: "1rem 1.25rem" }}>
             <div style={{
@@ -581,8 +647,7 @@ function MinSize({ assetGroups }) {
 }
 
 // 4. Usos não permitidos — 8 violações simuladas via CSS
-function DontDoList({ assetGroups }) {
-  const url = findLogoFile(assetGroups, "Logo Positivo");
+function DontDoList({ primaryLogoUrl }) {
   const violations = [
     { letter: "A", label: "Não distorça",                   style: { transform: "skewX(-15deg) scale(1.05, 0.9)" } },
     { letter: "B", label: "Não estique ou comprima",        style: { transform: "scaleX(1.5)" } },
@@ -601,15 +666,15 @@ function DontDoList({ assetGroups }) {
             height: 140, background: v.bg || "#FFF",
             display: "flex", alignItems: "center", justifyContent: "center",
             borderBottom: "1px solid #EFEFEF", position: "relative", overflow: "hidden",
+            padding: "0.5rem",
           }}>
-            {/* X vermelho de "proibido" sobreposto */}
             <div style={{
               position: "absolute", top: 8, right: 10, color: "#D32F2F",
               fontSize: "1.2rem", fontWeight: 700, lineHeight: 1, zIndex: 2,
             }}>×</div>
-            {url && (
-              <img src={url} alt={v.label} style={{
-                maxWidth: "70%", maxHeight: 60, objectFit: "contain", ...v.style,
+            {primaryLogoUrl && (
+              <img src={primaryLogoUrl} alt={v.label} style={{
+                maxWidth: "92%", maxHeight: 90, objectFit: "contain", ...v.style,
               }} />
             )}
           </div>
@@ -659,11 +724,11 @@ function SealList({ assetGroups }) {
                 return (
                   <div key={fundo} style={{ border: "1px solid #EFEFEF", background: "#FFF" }}>
                     <div style={{
-                      height: 130, background: bgMap[bgKey],
+                      height: 150, background: bgMap[bgKey],
                       display: "flex", alignItems: "center", justifyContent: "center",
-                      borderBottom: "1px solid #EFEFEF",
+                      borderBottom: "1px solid #EFEFEF", padding: "1rem",
                     }}>
-                      {url && <img src={url} alt={name} style={{ maxWidth: "60%", maxHeight: 80, objectFit: "contain" }} />}
+                      {url && <img src={url} alt={name} style={{ maxWidth: "85%", maxHeight: 115, objectFit: "contain" }} />}
                     </div>
                     <div style={{ padding: "0.75rem 1rem", fontSize: "0.75rem", color: "#59595B", letterSpacing: "0.04em" }}>
                       Fundo {fundo}
@@ -822,7 +887,7 @@ function BrandPortal({ data }) {
           fontSize: "clamp(2rem, 3.5vw, 3rem)", fontWeight: 600, letterSpacing: "-0.03em",
           lineHeight: 1.05, margin: "0 0 3rem 0", maxWidth: 760,
         }}>{data.pages.bastidores?.subtitle || "O contexto que originou o projeto."}</h2>
-        <MarkdownContent source={data.pages.bastidores?.content_md} />
+        <MarkdownTwoColumns source={data.pages.bastidores?.content_md} />
       </section>
 
       {/* VISÃO */}
@@ -960,15 +1025,15 @@ function BrandPortal({ data }) {
         </TechSubsection>
 
         <TechSubsection title="Margem de respiro">
-          <ClearSpace assetGroups={data.assetGroups} />
+          <ClearSpace assetGroups={data.assetGroups} primaryLogoUrl={data.primaryLogoUrl} />
         </TechSubsection>
 
         <TechSubsection title="Redução mínima">
-          <MinSize assetGroups={data.assetGroups} />
+          <MinSize primaryLogoUrl={data.primaryLogoUrl} />
         </TechSubsection>
 
         <TechSubsection title="Usos não permitidos">
-          <DontDoList assetGroups={data.assetGroups} />
+          <DontDoList primaryLogoUrl={data.primaryLogoUrl} />
         </TechSubsection>
 
         <TechSubsection title="Selos">
