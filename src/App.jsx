@@ -105,19 +105,18 @@ function transformToPortalData(brand, tokens, pages, assets) {
     description: brand.description,
     primaryLogoUrl,
     version: "v1.0 · abr/2026",
-    essence: "Built to run.",
+    essence: "Do PowerPoint à produção.",
     colors,
     typography,
     pages: pagesBySlug,
     assetGroups,
-    // Atributos não estão estruturados no banco ainda; entram como JSON em iteração futura
+    // Direcionadores da marca (ainda hardcoded; migram pra coluna metadata em iteração futura)
     attributes: [
-      { label: "Preciso",  description: "Sistemas que executam o que prometem." },
-      { label: "Discreto", description: "Protagonismo da operação, não da marca." },
-      { label: "Direto",   description: "Comunicação sem ruído." },
-      { label: "Vivo",     description: "Verde como sinal de execução em andamento." },
+      { label: "Criativa", description: "Integração que resolve. Conceito e função numa só expressão." },
+      { label: "Moderna",  description: "Contemporânea sem ser tendência. Rigor antes de efeito." },
+      { label: "Ousada",   description: "Convicção na forma certa. Afirma, não grita." },
     ],
-    systemNote: "O verde #00E37A é a cor mais expressiva do sistema. Use com parcimônia — como acento, sinalizador ou ponto focal. Quando aplicado em grandes áreas, o fundo preferido é o preto, que potencializa o brilho.",
+    systemNote: "O verde é a cor mais expressiva do sistema. Use com parcimônia — como acento, sinalizador ou ponto focal. Quando aplicado em grandes áreas, o fundo preferido é o preto, que potencializa o brilho.",
   };
 }
 
@@ -144,6 +143,75 @@ function SectionNumber({ n, children }) {
       <span>{n}</span>
       <span style={{ width: 24, height: 1, background: "#CCC" }} />
       <span>{children}</span>
+    </div>
+  );
+}
+
+// Extrai apenas a seção "## Golden Circle" do markdown da Visão
+// (os direcionadores são renderizados como cards visuais separadamente)
+function extractGoldenCircle(md) {
+  if (!md) return "";
+  const marker = "## Golden Circle";
+  const idx = md.indexOf(marker);
+  if (idx === -1) return "";
+  return md.slice(idx + marker.length).trim();
+}
+
+// Renderiza Markdown simples (h2, h3, bold, italic, parágrafos) com tipografia da marca
+function MarkdownContent({ source, maxWidth = 760 }) {
+  if (!source) return null;
+
+  // Processa inline: **bold** e *italic*
+  const inline = (text) => {
+    const parts = [];
+    let remaining = text;
+    let key = 0;
+    const re = /(\*\*([^*]+)\*\*|\*([^*]+)\*)/;
+    while (remaining.length > 0) {
+      const match = remaining.match(re);
+      if (!match) {
+        parts.push(remaining);
+        break;
+      }
+      if (match.index > 0) parts.push(remaining.slice(0, match.index));
+      if (match[2]) parts.push(<strong key={key++} style={{ fontWeight: 600, color: "#000" }}>{match[2]}</strong>);
+      else if (match[3]) parts.push(<em key={key++}>{match[3]}</em>);
+      remaining = remaining.slice(match.index + match[0].length);
+    }
+    return parts;
+  };
+
+  // Divide em blocos por linhas em branco
+  const blocks = source.trim().split(/\n\s*\n/);
+
+  return (
+    <div style={{ maxWidth, fontFamily: "'Sora', sans-serif" }}>
+      {blocks.map((block, i) => {
+        const trimmed = block.trim();
+        if (trimmed.startsWith("### ")) {
+          return (
+            <h3 key={i} style={{
+              fontSize: "1.05rem", fontWeight: 600, letterSpacing: "-0.01em",
+              margin: "2rem 0 0.75rem 0", color: "#000",
+            }}>{inline(trimmed.slice(4))}</h3>
+          );
+        }
+        if (trimmed.startsWith("## ")) {
+          return (
+            <h2 key={i} style={{
+              fontSize: "1.35rem", fontWeight: 600, letterSpacing: "-0.02em",
+              margin: "3rem 0 1rem 0", color: "#000",
+              paddingTop: "2rem", borderTop: "1px solid #EFEFEF",
+            }}>{inline(trimmed.slice(3))}</h2>
+          );
+        }
+        return (
+          <p key={i} style={{
+            fontSize: "1.02rem", lineHeight: 1.7, color: "#000",
+            margin: "0 0 1.25rem 0",
+          }}>{inline(trimmed)}</p>
+        );
+      })}
     </div>
   );
 }
@@ -309,7 +377,7 @@ function ErrorScreen({ message }) {
 // ═══════════════════════════════════════════════════════════════════════
 
 function BrandPortal({ data }) {
-  const [activePage, setActivePage] = useState("visao");
+  const [activePage, setActivePage] = useState("bastidores");
   const [filter, setFilter] = useState("all");
 
   useEffect(() => {
@@ -329,9 +397,11 @@ function BrandPortal({ data }) {
   }, []);
 
   const pages = [
-    { id: "visao",     label: "Visão" },
-    { id: "sistema",   label: "Sistema" },
-    { id: "downloads", label: "Downloads" },
+    { id: "bastidores", label: "Bastidores" },
+    { id: "visao",      label: "Visão" },
+    { id: "conceito",   label: "Conceito" },
+    { id: "sistema",    label: "Sistema" },
+    { id: "downloads",  label: "Downloads" },
   ];
 
   const categories = ["all", ...Array.from(new Set(data.assetGroups.map(g => g.category)))];
@@ -390,7 +460,7 @@ function BrandPortal({ data }) {
         )}
         <p style={{
           fontSize: "clamp(1.1rem, 1.8vw, 1.5rem)", fontWeight: 400, color: "#000",
-          maxWidth: 720, lineHeight: 1.4, letterSpacing: "-0.01em", margin: "0 0 2.5rem 0",
+          maxWidth: 760, lineHeight: 1.4, letterSpacing: "-0.01em", margin: "0 0 2.5rem 0",
         }}>{data.tagline}</p>
         <div style={{
           display: "inline-flex", alignItems: "center", gap: "0.75rem",
@@ -401,48 +471,88 @@ function BrandPortal({ data }) {
         </div>
       </section>
 
+      {/* BASTIDORES */}
+      <section id="bastidores" style={{
+        maxWidth: 1280, margin: "0 auto", padding: "5rem 2.5rem", borderTop: "1px solid #EFEFEF",
+      }}>
+        <SectionNumber n="01">Bastidores</SectionNumber>
+        <h2 style={{
+          fontSize: "clamp(2rem, 3.5vw, 3rem)", fontWeight: 600, letterSpacing: "-0.03em",
+          lineHeight: 1.05, margin: "0 0 3rem 0", maxWidth: 760,
+        }}>{data.pages.bastidores?.subtitle || "O contexto que originou o projeto."}</h2>
+        <MarkdownContent source={data.pages.bastidores?.content_md} />
+      </section>
+
+      {/* VISÃO */}
       <section id="visao" style={{
         maxWidth: 1280, margin: "0 auto", padding: "5rem 2.5rem", borderTop: "1px solid #EFEFEF",
       }}>
-        <SectionNumber n="01">Visão</SectionNumber>
-        <div style={{
-          display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(0, 1.5fr)",
-          gap: "4rem", marginBottom: "4rem",
+        <SectionNumber n="02">Visão</SectionNumber>
+        <h2 style={{
+          fontSize: "clamp(2rem, 3.5vw, 3rem)", fontWeight: 600, letterSpacing: "-0.03em",
+          lineHeight: 1.05, margin: "0 0 3rem 0", maxWidth: 760,
+        }}>Essência, direcionadores e propósito.</h2>
+
+        <p style={{
+          fontSize: "1.25rem", lineHeight: 1.5, color: "#000", letterSpacing: "-0.01em",
+          maxWidth: 760, margin: "0 0 4rem 0", fontWeight: 400,
         }}>
-          <h2 style={{
-            fontSize: "clamp(2rem, 3.5vw, 3rem)", fontWeight: 600, letterSpacing: "-0.03em",
-            lineHeight: 1.05, margin: 0,
-          }}>O território conceitual da {data.name}.</h2>
-          <div style={{ fontSize: "1.05rem", lineHeight: 1.7, color: "#000" }}>
-            <p style={{ margin: 0, color: "#59595B" }}>{data.description}</p>
+          <strong style={{ fontWeight: 600 }}>Do PowerPoint à produção</strong> — a ponte que transforma iniciativa de IA em resultado real.
+        </p>
+
+        <div style={{ marginBottom: "4rem" }}>
+          <div style={{
+            fontSize: "0.7rem", fontWeight: 500, letterSpacing: "0.18em",
+            textTransform: "uppercase", color: "#59595B", marginBottom: "1.5rem",
+          }}>Direcionadores</div>
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+            gap: "1px", background: "#EFEFEF",
+            borderTop: "1px solid #EFEFEF", borderBottom: "1px solid #EFEFEF",
+          }}>
+            {data.attributes.map((attr, i) => (
+              <div key={attr.label} style={{ padding: "2.5rem 2rem", background: "#FFF" }}>
+                <div style={{
+                  fontSize: "0.65rem", fontWeight: 500, letterSpacing: "0.15em",
+                  textTransform: "uppercase", color: "#59595B", marginBottom: "0.8rem",
+                }}>0{i + 1}</div>
+                <div style={{ fontSize: "1.5rem", fontWeight: 600, marginBottom: "0.75rem", letterSpacing: "-0.02em" }}>
+                  {attr.label}
+                </div>
+                <div style={{ fontSize: "0.9rem", color: "#59595B", lineHeight: 1.55 }}>
+                  {attr.description}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-        <div style={{
-          display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-          gap: "1px", background: "#EFEFEF",
-          borderTop: "1px solid #EFEFEF", borderBottom: "1px solid #EFEFEF",
-        }}>
-          {data.attributes.map((attr, i) => (
-            <div key={attr.label} style={{ padding: "2.25rem 1.75rem", background: "#FFF" }}>
-              <div style={{
-                fontSize: "0.65rem", fontWeight: 500, letterSpacing: "0.15em",
-                textTransform: "uppercase", color: "#59595B", marginBottom: "0.8rem",
-              }}>0{i + 1}</div>
-              <div style={{ fontSize: "1.35rem", fontWeight: 600, marginBottom: "0.5rem", letterSpacing: "-0.02em" }}>
-                {attr.label}
-              </div>
-              <div style={{ fontSize: "0.85rem", color: "#59595B", lineHeight: 1.5 }}>
-                {attr.description}
-              </div>
-            </div>
-          ))}
+
+        <div>
+          <div style={{
+            fontSize: "0.7rem", fontWeight: 500, letterSpacing: "0.18em",
+            textTransform: "uppercase", color: "#59595B", marginBottom: "1.5rem",
+          }}>Golden Circle</div>
+          <MarkdownContent source={extractGoldenCircle(data.pages.visao?.content_md)} />
         </div>
       </section>
 
+      {/* CONCEITO */}
+      <section id="conceito" style={{
+        maxWidth: 1280, margin: "0 auto", padding: "5rem 2.5rem", borderTop: "1px solid #EFEFEF",
+      }}>
+        <SectionNumber n="03">Conceito</SectionNumber>
+        <h2 style={{
+          fontSize: "clamp(2rem, 3.5vw, 3rem)", fontWeight: 600, letterSpacing: "-0.03em",
+          lineHeight: 1.05, margin: "0 0 3rem 0", maxWidth: 760,
+        }}>{data.pages.conceito?.subtitle || "Do pixel ao cubo."}</h2>
+        <MarkdownContent source={data.pages.conceito?.content_md} />
+      </section>
+
+      {/* SISTEMA VISUAL */}
       <section id="sistema" style={{
         maxWidth: 1280, margin: "0 auto", padding: "5rem 2.5rem", borderTop: "1px solid #EFEFEF",
       }}>
-        <SectionNumber n="02">Sistema Visual</SectionNumber>
+        <SectionNumber n="04">Sistema Visual</SectionNumber>
         <h2 style={{
           fontSize: "clamp(2rem, 3.5vw, 3rem)", fontWeight: 600, letterSpacing: "-0.03em",
           lineHeight: 1.05, margin: "0 0 4rem 0", maxWidth: 700,
@@ -489,7 +599,7 @@ function BrandPortal({ data }) {
       <section id="downloads" style={{
         maxWidth: 1280, margin: "0 auto", padding: "5rem 2.5rem", borderTop: "1px solid #EFEFEF",
       }}>
-        <SectionNumber n="03">Downloads</SectionNumber>
+        <SectionNumber n="05">Downloads</SectionNumber>
         <h2 style={{
           fontSize: "clamp(2rem, 3.5vw, 3rem)", fontWeight: 600, letterSpacing: "-0.03em",
           lineHeight: 1.05, margin: "0 0 1rem 0",
