@@ -569,45 +569,85 @@ function LogoOnBackgrounds({ assetGroups }) {
   );
 }
 
-// 2. Margem de respiro com o cubo como módulo virtual de referência
+// 2. Margem de respiro — hachura na área de proteção, cubo como módulo virtual
 function ClearSpace({ assetGroups, primaryLogoUrl }) {
   const cubeUrl = findLogoFile(assetGroups, "Símbolo (Cubo)");
+
+  // Hachura diagonal sutil para representar a área de proteção
+  const hatchBg = `repeating-linear-gradient(
+    -45deg,
+    rgba(0, 0, 0, 0.18),
+    rgba(0, 0, 0, 0.18) 1px,
+    transparent 1px,
+    transparent 7px
+  )`;
+
+  const xMarker = {
+    position: "absolute",
+    fontFamily: "'Sora', sans-serif", fontSize: "0.7rem", fontWeight: 500,
+    color: "#000", fontStyle: "italic", background: "#FFF", padding: "0 4px",
+  };
 
   return (
     <div>
       <div style={{
-        padding: "4rem 3rem", background: "#FAFAFA", border: "1px solid #EFEFEF",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        marginBottom: "1.5rem",
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 1fr) auto",
+        gap: "3rem", alignItems: "center",
+        marginBottom: "2rem",
       }}>
+        {/* Diagrama com hachura */}
         <div style={{
-          position: "relative", padding: "70px 90px",
-          border: "1px dashed rgba(0, 227, 122, 0.6)",
-          display: "inline-flex", alignItems: "center", justifyContent: "center",
+          position: "relative", width: "100%",
+          aspectRatio: "16 / 8",
+          backgroundImage: hatchBg,
+          border: "1px solid #BBB",
+          minHeight: 280,
         }}>
-          {/* Cubo módulo nos 4 cantos da borda — referência virtual de margem */}
-          {cubeUrl && [
-            { top: -28, left: -28 },
-            { top: -28, right: -28 },
-            { bottom: -28, left: -28 },
-            { bottom: -28, right: -28 },
-          ].map((pos, i) => (
-            <img key={i} src={cubeUrl} alt="módulo" style={{
-              position: "absolute", ...pos, width: 56, height: 56, objectFit: "contain",
-              opacity: 0.85,
+          {/* Área interna branca (safe area do logo) */}
+          <div style={{
+            position: "absolute",
+            top: "22%", bottom: "22%", left: "14%", right: "14%",
+            background: "#FFF",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "1.5rem",
+          }}>
+            {primaryLogoUrl && (
+              <img src={primaryLogoUrl} alt="Logo com margem de respiro" style={{
+                maxWidth: "100%", maxHeight: "100%", objectFit: "contain", display: "block",
+              }} />
+            )}
+          </div>
+
+          {/* Marcadores X — um em cada uma das 4 margens */}
+          <span style={{ ...xMarker, top: "11%", left: "50%", transform: "translate(-50%, -50%)" }}>x</span>
+          <span style={{ ...xMarker, bottom: "11%", left: "50%", transform: "translate(-50%, 50%)" }}>x</span>
+          <span style={{ ...xMarker, top: "50%", left: "7%", transform: "translate(-50%, -50%)" }}>x</span>
+          <span style={{ ...xMarker, top: "50%", right: "7%", transform: "translate(50%, -50%)" }}>x</span>
+        </div>
+
+        {/* Legenda X = cubo */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: "1rem",
+          padding: "1rem 1.25rem",
+        }}>
+          <span style={{
+            fontFamily: "'Sora', sans-serif", fontSize: "1.4rem", fontWeight: 500,
+            fontStyle: "italic",
+          }}>X =</span>
+          {cubeUrl && (
+            <img src={cubeUrl} alt="Cubo · módulo" style={{
+              width: 64, height: 64, objectFit: "contain", display: "block",
             }} />
-          ))}
-          {/* Logo principal no centro */}
-          {primaryLogoUrl && <img src={primaryLogoUrl} alt="Logo" style={{
-            height: 90, display: "block",
-          }} />}
+          )}
         </div>
       </div>
+
       <p style={{ fontSize: "0.95rem", color: "#000", lineHeight: 1.65, maxWidth: 760, margin: 0 }}>
-        A marca precisa de espaço ao redor, livre de interferência de outros elementos gráficos
-        como textos, fotos ou outras marcas. Use o <strong>símbolo do cubo</strong> como módulo virtual
-        de referência — a margem mínima deve corresponder, no mínimo, à <strong>altura de um cubo</strong>
-        em cada um dos quatro lados. A regra é proporcional: quanto maior a aplicação, maior a margem.
+        É importante manter espaço ao redor da marca, livre de interferência de outros elementos
+        gráficos como textos, fotos ou outras marcas. Como referência visual, a margem de segurança
+        é obtida com a <strong>altura do cubo</strong> de "pixxel". A mesma regra se aplica em todos
+        os segmentos e configurações da assinatura visual.
       </p>
     </div>
   );
@@ -615,10 +655,11 @@ function ClearSpace({ assetGroups, primaryLogoUrl }) {
 
 // 3. Redução mínima — tamanhos para diferentes meios
 function MinSize({ primaryLogoUrl }) {
+  // Conversão mm → px @ 96dpi: 5mm ≈ 19px · 30mm ≈ 113px
   const sizes = [
-    { label: "Digital",          value: "48px", desc: "Altura mínima em telas",         height: 48 },
-    { label: "Impresso pequeno", value: "15mm", desc: "Cartões, etiquetas, brindes",    height: 64 },
-    { label: "Impresso grande",  value: "30mm", desc: "Materiais institucionais",       height: 96 },
+    { label: "Digital",          value: "24px", desc: "Altura mínima em telas",         height: 24 },
+    { label: "Impresso pequeno", value: "5mm",  desc: "Cartões, etiquetas, brindes",    height: 19 },
+    { label: "Impresso grande",  value: "30mm", desc: "Materiais institucionais",       height: 113 },
   ];
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "1rem" }}>
