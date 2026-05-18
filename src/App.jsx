@@ -75,8 +75,12 @@ function transformToPortalData(brand, tokens, pages, assets) {
   // Pula 'system' (recursos internos do portal) e 'mockup' (galeria de aplicações)
   const groupsMap = new Map();
   const mockups = [];
+  const systemAssets = {};
   for (const a of assets) {
-    if (a.category === "system") continue;
+    if (a.category === "system") {
+      systemAssets[a.name] = `${STORAGE_PUBLIC}${a.storage_path}`;
+      continue;
+    }
     if (a.category === "mockup") {
       mockups.push({
         name: a.name,
@@ -123,6 +127,7 @@ function transformToPortalData(brand, tokens, pages, assets) {
     pages: pagesBySlug,
     assetGroups,
     mockups: sortedMockups,
+    systemAssets,
     // Direcionadores da marca (ainda hardcoded; migram pra coluna metadata em iteração futura)
     attributes: [
       { label: "Criativa", description: "Integração que resolve. Conceito e função numa só expressão." },
@@ -569,121 +574,24 @@ function LogoOnBackgrounds({ assetGroups }) {
   );
 }
 
-// 2. Margem de respiro — hachura externa = "fora", branco = margem, cubos = módulo X
-function ClearSpace({ assetGroups, primaryLogoUrl }) {
-  const cubeUrl = findLogoFile(assetGroups, "Símbolo (Cubo)");
-
-  // Hachura diagonal sutil para representar a superfície externa (qualquer ambiente de aplicação)
-  const hatchBg = `repeating-linear-gradient(
-    -45deg,
-    rgba(0, 0, 0, 0.22),
-    rgba(0, 0, 0, 0.22) 1px,
-    transparent 1px,
-    transparent 7px
-  )`;
-
-  const xMarker = {
-    position: "absolute",
-    fontFamily: "'Sora', sans-serif", fontSize: "0.75rem", fontWeight: 500,
-    color: "#000", fontStyle: "italic", background: "#FFF", padding: "0 5px",
-    zIndex: 3,
-  };
-
-  const guideLine = (orientation) => ({
-    position: "absolute",
-    background: "#000",
-    ...(orientation === "vertical" ? { width: 1 } : { height: 1 }),
-    zIndex: 2,
-  });
-
+// 2. Margem de respiro — usa diagrama oficial preparado pelo designer
+function ClearSpace({ diagramUrl }) {
   return (
     <div>
       <div style={{
-        display: "grid",
-        gridTemplateColumns: "minmax(0, 1fr) auto",
-        gap: "3rem", alignItems: "center",
-        marginBottom: "2rem",
+        background: "#FAFAFA", padding: "2rem", marginBottom: "1.5rem",
+        display: "flex", alignItems: "center", justifyContent: "center",
       }}>
-        {/* Container externo: hachura representa a superfície de aplicação */}
-        <div style={{
-          position: "relative", width: "100%",
-          aspectRatio: "16 / 8",
-          backgroundImage: hatchBg,
-          minHeight: 320,
-        }}>
-          {/* Caixa branca = margem de respiro propriamente dita */}
-          <div style={{
-            position: "absolute",
-            top: "8%", bottom: "8%", left: "6%", right: "6%",
-            background: "#FFF",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            {/* Cubos fantasmas — preenchem visualmente cada margem (X = altura do cubo) */}
-            {cubeUrl && (
-              <>
-                <img src={cubeUrl} alt="" aria-hidden style={{
-                  position: "absolute", top: "8%", left: "50%", transform: "translateX(-50%)",
-                  height: "26%", opacity: 0.22, zIndex: 1, pointerEvents: "none",
-                }} />
-                <img src={cubeUrl} alt="" aria-hidden style={{
-                  position: "absolute", bottom: "8%", left: "50%", transform: "translateX(-50%)",
-                  height: "26%", opacity: 0.22, zIndex: 1, pointerEvents: "none",
-                }} />
-                <img src={cubeUrl} alt="" aria-hidden style={{
-                  position: "absolute", left: "4%", top: "50%", transform: "translateY(-50%)",
-                  height: "32%", opacity: 0.22, zIndex: 1, pointerEvents: "none",
-                }} />
-                <img src={cubeUrl} alt="" aria-hidden style={{
-                  position: "absolute", right: "4%", top: "50%", transform: "translateY(-50%)",
-                  height: "32%", opacity: 0.22, zIndex: 1, pointerEvents: "none",
-                }} />
-              </>
-            )}
-
-            {/* Logo principal no centro */}
-            {primaryLogoUrl && (
-              <img src={primaryLogoUrl} alt="Logo com margem de respiro" style={{
-                height: "42%", maxWidth: "55%", objectFit: "contain",
-                display: "block", position: "relative", zIndex: 2,
-              }} />
-            )}
-
-            {/* Linhas guia + marcadores X — uma em cada lado, indicando a medida da margem */}
-            {/* Topo: linha vertical do topo da caixa branca até o topo do logo */}
-            <div style={{ ...guideLine("vertical"), top: 0, bottom: "71%", left: "62%" }} />
-            <span style={{ ...xMarker, top: "12%", left: "62%", transform: "translate(-50%, -50%)" }}>x</span>
-
-            {/* Base: linha vertical da base do logo até a base da caixa branca */}
-            <div style={{ ...guideLine("vertical"), top: "71%", bottom: 0, left: "62%" }} />
-            <span style={{ ...xMarker, top: "88%", left: "62%", transform: "translate(-50%, -50%)" }}>x</span>
-
-            {/* Esquerda: linha horizontal da esquerda da caixa branca até a esquerda do logo */}
-            <div style={{ ...guideLine("horizontal"), left: 0, right: "78%", top: "50%" }} />
-            <span style={{ ...xMarker, top: "50%", left: "11%", transform: "translate(-50%, -50%)" }}>x</span>
-
-            {/* Direita: linha horizontal da direita do logo até a direita da caixa branca */}
-            <div style={{ ...guideLine("horizontal"), left: "78%", right: 0, top: "50%" }} />
-            <span style={{ ...xMarker, top: "50%", right: "11%", transform: "translate(50%, -50%)" }}>x</span>
-          </div>
-        </div>
-
-        {/* Legenda lateral: X = cubo */}
-        <div style={{
-          display: "flex", alignItems: "center", gap: "1rem",
-          padding: "1rem 1.25rem",
-        }}>
+        {diagramUrl ? (
+          <img src={diagramUrl} alt="Diagrama da margem de respiro" style={{
+            maxWidth: "100%", height: "auto", display: "block",
+          }} />
+        ) : (
           <span style={{
-            fontFamily: "'Sora', sans-serif", fontSize: "1.4rem", fontWeight: 500,
-            fontStyle: "italic",
-          }}>X =</span>
-          {cubeUrl && (
-            <img src={cubeUrl} alt="Cubo · módulo" style={{
-              width: 64, height: 64, objectFit: "contain", display: "block",
-            }} />
-          )}
-        </div>
+            fontSize: "0.8rem", color: "#59595B", fontStyle: "italic",
+          }}>Diagrama não encontrado no banco.</span>
+        )}
       </div>
-
       <p style={{ fontSize: "0.95rem", color: "#000", lineHeight: 1.65, maxWidth: 760, margin: 0 }}>
         É importante manter espaço ao redor da marca, livre de interferência de outros elementos
         gráficos como textos, fotos ou outras marcas. Como referência visual, a margem de segurança
@@ -1107,7 +1015,7 @@ function BrandPortal({ data }) {
         </TechSubsection>
 
         <TechSubsection title="Margem de respiro">
-          <ClearSpace assetGroups={data.assetGroups} primaryLogoUrl={data.primaryLogoUrl} />
+          <ClearSpace diagramUrl={data.systemAssets?.["Diagrama · Margem de respiro"]} />
         </TechSubsection>
 
         <TechSubsection title="Redução mínima">
