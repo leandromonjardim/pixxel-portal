@@ -3,14 +3,38 @@ import { Download, Copy, Check, ArrowUpRight, AlertCircle } from "lucide-react";
 
 // ─────────────────────────────────────────────────────────────────────────
 // PORTAL DE MARCA · monJARDIM
-// Conectado ao Supabase em tempo real. Para usar com outra marca, basta
-// trocar o BRAND_SLUG abaixo. Tudo o mais vem do banco.
+// Conectado ao Supabase em tempo real. A marca é detectada pelo hostname:
+//   pixxel.monjardim.com → pixxel
+//   sevven.monjardim.com → sevven
+// Em dev/preview, fallback via ?brand=xxx ou primeiro subdomínio.
 // ─────────────────────────────────────────────────────────────────────────
 
 const SUPABASE_URL = "https://rinkrxztwdzvksxamsdk.supabase.co";
 const SUPABASE_KEY = "sb_publishable_MPk8VBWjB8bWTtSAJoJfOg_avpQC69c";
 const STORAGE_PUBLIC = `${SUPABASE_URL}/storage/v1/object/public/brand-assets/`;
-const BRAND_SLUG = "pixxel";
+
+const HOSTNAME_TO_SLUG = {
+  "pixxel.monjardim.com": "pixxel",
+  "sevven.monjardim.com": "sevven",
+};
+const DEFAULT_SLUG = "pixxel";
+
+function detectBrandSlug() {
+  if (typeof window === "undefined") return DEFAULT_SLUG;
+  const params = new URLSearchParams(window.location.search);
+  const queryOverride = params.get("brand");
+  if (queryOverride) return queryOverride;
+  const hostname = window.location.hostname;
+  if (HOSTNAME_TO_SLUG[hostname]) return HOSTNAME_TO_SLUG[hostname];
+  // Fallback: primeiro subdomínio (útil para previews do Vercel)
+  const parts = hostname.split(".");
+  if (parts.length > 1 && parts[0] && parts[0] !== "www" && parts[0] !== "localhost") {
+    return parts[0];
+  }
+  return DEFAULT_SLUG;
+}
+
+const BRAND_SLUG = detectBrandSlug();
 
 // ═══════════════════════════════════════════════════════════════════════
 // DATA LAYER · busca e transforma os dados do banco
@@ -114,28 +138,63 @@ function transformToPortalData(brand, tokens, pages, assets) {
   const assetGroups = Array.from(groupsMap.values()).sort((a, b) => a.sortOrder - b.sortOrder);
   const sortedMockups = mockups.sort((a, b) => a.sortOrder - b.sortOrder);
 
+  // Cor de acento: token "accent" se houver, senão "primary", senão fallback
+  const colorByKey = Object.fromEntries(colors.map(c => [c.key, c.hex]));
+  const accentColor = colorByKey.accent || colorByKey.primary || "#000000";
+
+  // Configurações vindas de brand.metadata (com fallbacks defensivos)
+  const meta = brand.metadata || {};
+
   return {
     name: brand.name,
     slug: brand.slug,
     tagline: brand.tagline,
     description: brand.description,
     primaryLogoUrl,
-    version: "v1.0 · abr/2026",
-    essence: "Do PowerPoint à produção.",
+    version: meta.version || "v1.0",
+    essence: meta.essence || "",
+    accentColor,
     colors,
+    colorByKey,
     typography,
     pages: pagesBySlug,
     assetGroups,
     mockups: sortedMockups,
     systemAssets,
-    // Direcionadores da marca (ainda hardcoded; migram pra coluna metadata em iteração futura)
-    attributes: [
-      { label: "Criativa", description: "Integração que resolve. Conceito e função numa só expressão." },
-      { label: "Moderna",  description: "Contemporânea sem ser tendência. Rigor antes de efeito." },
-      { label: "Ousada",   description: "Convicção na forma certa. Afirma, não grita." },
-    ],
-    systemNote: "O verde é a cor mais expressiva do sistema. Use com parcimônia — como acento, sinalizador ou ponto focal. Quando aplicado em grandes áreas, o fundo preferido é o preto, que potencializa o brilho.",
+    attributes: Array.isArray(meta.attributes) ? meta.attributes : [],
+    systemNote: meta.system_note || "",
+    logoBackgrounds: Array.isArray(meta.logo_backgrounds) ? meta.logo_backgrounds : [],
+    sealFamilies: Array.isArray(meta.seal_families) ? meta.seal_families : [],
+    clearSpaceText: meta.clear_space_text || "É importante manter espaço ao redor da marca, livre de interferência de outros elementos gráficos.",
+    visionLede: meta.vision_lede || { highlight: "", tail: "" },
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+// HELPERS · cor
+// ═══════════════════════════════════════════════════════════════════════
+
+// Calcula luminância relativa (W3C). Cores muito claras precisam de texto escuro.
+function isLightColor(hex) {
+  if (!hex) return false;
+  const c = hex.replace("#", "");
+  if (c.length !== 6) return false;
+  const r = parseInt(c.slice(0, 2), 16);
+  const g = parseInt(c.slice(2, 4), 16);
+  const b = parseInt(c.slice(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance > 0.65;
+}
+
+// Converte "#RRGGBB" em "r, g, b" para uso em rgba()
+function hexToRgbTriple(hex) {
+  if (!hex) return "0, 0, 0";
+  const c = hex.replace("#", "");
+  if (c.length !== 6) return "0, 0, 0";
+  const r = parseInt(c.slice(0, 2), 16);
+  const g = parseInt(c.slice(2, 4), 16);
+  const b = parseInt(c.slice(4, 6), 16);
+  return `${r}, ${g}, ${b}`;
 }
 
 const CATEGORY_LABELS = {
@@ -166,7 +225,7 @@ function SectionNumber({ n, children }) {
 }
 
 // Variante: intro + seções `## ` lado a lado em duas colunas (usado em Bastidores)
-function MarkdownTwoColumns({ source }) {
+function MarkdownTwoColumns({ source, accentColor = "#000" }) {
   if (!source) return null;
 
   // Divide o markdown no primeiro `## `
@@ -195,7 +254,7 @@ function MarkdownTwoColumns({ source }) {
     <div>
       {intro && (
         <div style={{ marginBottom: "3.5rem" }}>
-          <MarkdownContent source={intro} maxWidth={800} />
+          <MarkdownContent source={intro} maxWidth={800} accentColor={accentColor} />
         </div>
       )}
       {sections.length > 0 && (
@@ -212,7 +271,7 @@ function MarkdownTwoColumns({ source }) {
                 fontSize: "1.15rem", fontWeight: 600, letterSpacing: "-0.02em",
                 margin: "0 0 1.25rem 0", color: "#000",
               }}>{s.title}</h3>
-              <MarkdownContent source={s.body} maxWidth={null} />
+              <MarkdownContent source={s.body} maxWidth={null} accentColor={accentColor} />
             </div>
           ))}
         </div>
@@ -232,7 +291,7 @@ function extractGoldenCircle(md) {
 }
 
 // Renderiza Markdown simples (h2, h3, bold, italic, parágrafos) com tipografia da marca
-function MarkdownContent({ source, maxWidth = 760 }) {
+function MarkdownContent({ source, maxWidth = 760, accentColor = "#000" }) {
   if (!source) return null;
 
   // Processa inline: **bold** e *italic*
@@ -269,7 +328,7 @@ function MarkdownContent({ source, maxWidth = 760 }) {
               margin: "2.5rem 0 0.85rem 0", color: "#000",
               display: "flex", alignItems: "center", gap: "0.85rem",
             }}>
-              <span style={{ width: 28, height: 2, background: "#00E37A", flexShrink: 0 }} />
+              <span style={{ width: 28, height: 2, background: accentColor, flexShrink: 0 }} />
               <span>{inline(trimmed.slice(4))}</span>
             </h3>
           );
@@ -296,7 +355,7 @@ function MarkdownContent({ source, maxWidth = 760 }) {
 
 function ColorSwatch({ color }) {
   const [copied, setCopied] = useState(false);
-  const isLight = ["#FFFFFF","#80F1BD","#D9FBEA"].includes(color.hex);
+  const isLight = isLightColor(color.hex);
   return (
     <button onClick={async () => {
       try { await navigator.clipboard.writeText(color.hex); setCopied(true); setTimeout(() => setCopied(false), 1500); } catch {}
@@ -353,7 +412,7 @@ function TypeSample({ token }) {
   );
 }
 
-function AssetCard({ group }) {
+function AssetCard({ group, accentColor = "#000" }) {
   const bgMap = { white: "#FFF", gray: "#59595B", black: "#000" };
   const previewBg = group.isPackage ? "#0A0A0A" : (bgMap[group.preferredBackground] || "#F7F7F7");
 
@@ -428,7 +487,7 @@ function AssetCard({ group }) {
             {group.isPrimary && (
               <span style={{
                 marginLeft: "0.5rem", fontSize: "0.6rem", fontWeight: 600,
-                letterSpacing: "0.12em", textTransform: "uppercase", color: "#00E37A",
+                letterSpacing: "0.12em", textTransform: "uppercase", color: accentColor,
               }}>· primária</span>
             )}
           </div>
@@ -537,20 +596,19 @@ function MockupGallery({ mockups }) {
 }
 
 // 1. Logos sobre cada fundo de aplicação
-function LogoOnBackgrounds({ assetGroups }) {
-  const bgMap = { white: "#FFF", gray: "#59595B", black: "#000" };
-  const items = [
-    { name: "Logo Positivo",           bg: "white", label: "Aplicação principal · fundos claros" },
-    { name: "Logo Negativo",           bg: "black", label: "Sobre fundos escuros" },
-    { name: "Logo sobre fundo branco", bg: "white", label: "Fundo branco institucional" },
-    { name: "Logo sobre fundo cinza",  bg: "gray",  label: "Fundo cinza · usos intermediários" },
-    { name: "Logo sobre fundo preto",  bg: "black", label: "Fundo preto · alto contraste" },
-  ];
+function LogoOnBackgrounds({ assetGroups, logoBackgrounds, colorByKey }) {
+  // Fallback caso o token semântico não exista no banco
+  const fallbackBg = { white: "#FFF", gray: "#59595B", black: "#000", neutral: "#BDC3C4", primary: "#000" };
+  const resolveBg = (token) => (colorByKey && colorByKey[token]) || fallbackBg[token] || "#F7F7F7";
+
+  if (!Array.isArray(logoBackgrounds) || logoBackgrounds.length === 0) {
+    return null;
+  }
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "1rem" }}>
-      {items.map(item => {
+      {logoBackgrounds.map(item => {
         const url = findLogoFile(assetGroups, item.name);
-        const bg = bgMap[item.bg];
+        const bg = resolveBg(item.bg_token);
         return (
           <div key={item.name} style={{
             border: "1px solid #EFEFEF", background: "#FFF",
@@ -575,7 +633,7 @@ function LogoOnBackgrounds({ assetGroups }) {
 }
 
 // 2. Margem de respiro — usa diagrama oficial preparado pelo designer
-function ClearSpace({ diagramUrl }) {
+function ClearSpace({ diagramUrl, text }) {
   return (
     <div>
       <div style={{
@@ -593,10 +651,7 @@ function ClearSpace({ diagramUrl }) {
         )}
       </div>
       <p style={{ fontSize: "0.95rem", color: "#000", lineHeight: 1.65, maxWidth: 760, margin: 0 }}>
-        É importante manter espaço ao redor da marca, livre de interferência de outros elementos
-        gráficos como textos, fotos ou outras marcas. Como referência visual, a margem de segurança
-        é obtida com a <strong>altura do cubo</strong> de "pixxel". A mesma regra se aplica em todos
-        os segmentos e configurações da assinatura visual.
+        {text}
       </p>
     </div>
   );
@@ -637,16 +692,17 @@ function MinSize({ primaryLogoUrl }) {
 }
 
 // 4. Usos não permitidos — 8 violações simuladas via CSS
-function DontDoList({ primaryLogoUrl }) {
+function DontDoList({ primaryLogoUrl, accentColor = "#000" }) {
+  const accentRgb = hexToRgbTriple(accentColor);
   const violations = [
     { letter: "A", label: "Não distorça",                   style: { transform: "skewX(-15deg) scale(1.05, 0.9)" } },
     { letter: "B", label: "Não estique ou comprima",        style: { transform: "scaleX(1.5)" } },
     { letter: "C", label: "Não altere a composição",        style: { transform: "scale(0.7)", opacity: 0.6 } },
     { letter: "D", label: "Não altere a cor",               style: { filter: "hue-rotate(200deg) saturate(2)" } },
     { letter: "E", label: "Não use cores não previstas",    bg: "#FFEB3B", style: {} },
-    { letter: "F", label: "Não aplique sombras ou efeitos", style: { filter: "drop-shadow(4px 6px 0px rgba(0,227,122,0.6))" } },
+    { letter: "F", label: "Não aplique sombras ou efeitos", style: { filter: `drop-shadow(4px 6px 0px rgba(${accentRgb}, 0.6))` } },
     { letter: "G", label: "Não rotacione",                  style: { transform: "rotate(-12deg)" } },
-    { letter: "H", label: "Não use sobre fundo ilegível",   bg: "linear-gradient(45deg, #00E37A 0%, #333 100%)", style: {} },
+    { letter: "H", label: "Não use sobre fundo ilegível",   bg: `linear-gradient(45deg, ${accentColor} 0%, #333 100%)`, style: {} },
   ];
   return (
     <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "1rem" }}>
@@ -682,13 +738,9 @@ function DontDoList({ primaryLogoUrl }) {
 }
 
 // 5. Selos — agrupados por família, mostrando as 3 variações de fundo de cada
-function SealList({ assetGroups }) {
+function SealList({ assetGroups, families }) {
+  if (!Array.isArray(families) || families.length === 0) return null;
   const bgMap = { white: "#FFF", gray: "#59595B", black: "#000" };
-  const families = [
-    { key: "URL",           label: "Selo URL",           prefix: "Selo URL",          desc: "Indica o domínio digital da marca em peças de comunicação." },
-    { key: "Built to Run",  label: "Selo Built to Run",  prefix: "Selo Built to Run", desc: "Assinatura conceitual que reforça a vocação para execução." },
-    { key: "Deck Deploy",   label: "Selo Deck Deploy",   prefix: "Selo Deck Deploy",  desc: "Selo aplicado em apresentações e materiais institucionais." },
-  ];
   return (
     <div>
       <p style={{ fontSize: "0.95rem", color: "#000", lineHeight: 1.6, maxWidth: 720, margin: "0 0 2rem 0" }}>
@@ -863,7 +915,7 @@ function BrandPortal({ data }) {
           display: "inline-flex", alignItems: "center", gap: "0.75rem",
           fontSize: "0.85rem", fontWeight: 500, color: "#59595B", letterSpacing: "0.04em",
         }}>
-          <span style={{ width: 32, height: 1, background: "#00E37A" }} />
+          <span style={{ width: 32, height: 1, background: data.accentColor }} />
           <span style={{ color: "#000", fontWeight: 600 }}>{data.essence}</span>
         </div>
       </section>
@@ -877,7 +929,7 @@ function BrandPortal({ data }) {
           fontSize: "clamp(2rem, 3.5vw, 3rem)", fontWeight: 600, letterSpacing: "-0.03em",
           lineHeight: 1.05, margin: "0 0 3rem 0", maxWidth: 760,
         }}>{data.pages.bastidores?.subtitle || "O contexto que originou o projeto."}</h2>
-        <MarkdownTwoColumns source={data.pages.bastidores?.content_md} />
+        <MarkdownTwoColumns source={data.pages.bastidores?.content_md} accentColor={data.accentColor} />
       </section>
 
       {/* VISÃO */}
@@ -894,7 +946,7 @@ function BrandPortal({ data }) {
           fontSize: "1.25rem", lineHeight: 1.5, color: "#000", letterSpacing: "-0.01em",
           maxWidth: 760, margin: "0 0 4rem 0", fontWeight: 400,
         }}>
-          <strong style={{ fontWeight: 600 }}>Do PowerPoint à produção</strong> — a ponte que transforma iniciativa de IA em resultado real.
+          <strong style={{ fontWeight: 600 }}>{data.visionLede.highlight}</strong>{data.visionLede.tail}
         </p>
 
         <div style={{ marginBottom: "4rem" }}>
@@ -929,7 +981,7 @@ function BrandPortal({ data }) {
             fontSize: "0.7rem", fontWeight: 500, letterSpacing: "0.18em",
             textTransform: "uppercase", color: "#59595B", marginBottom: "1.5rem",
           }}>Golden Circle</div>
-          <MarkdownContent source={extractGoldenCircle(data.pages.visao?.content_md)} />
+          <MarkdownContent source={extractGoldenCircle(data.pages.visao?.content_md)} accentColor={data.accentColor} />
         </div>
       </section>
 
@@ -942,7 +994,7 @@ function BrandPortal({ data }) {
           fontSize: "clamp(2rem, 3.5vw, 3rem)", fontWeight: 600, letterSpacing: "-0.03em",
           lineHeight: 1.05, margin: "0 0 3rem 0", maxWidth: 760,
         }}>{data.pages.conceito?.subtitle || "Do pixel ao cubo."}</h2>
-        <MarkdownContent source={data.pages.conceito?.content_md} />
+        <MarkdownContent source={data.pages.conceito?.content_md} accentColor={data.accentColor} />
       </section>
 
       {/* SISTEMA VISUAL */}
@@ -973,7 +1025,7 @@ function BrandPortal({ data }) {
             marginTop: "2.5rem", padding: "1.25rem 1.5rem", background: "#000", color: "#FFF",
             fontSize: "0.9rem", lineHeight: 1.55, display: "flex", gap: "1.25rem",
           }}>
-            <div style={{ width: 3, alignSelf: "stretch", background: "#00E37A", flexShrink: 0 }} />
+            <div style={{ width: 3, alignSelf: "stretch", background: data.accentColor, flexShrink: 0 }} />
             <div><strong>Uso da cor primária. </strong>{data.systemNote}</div>
           </div>
         </div>
@@ -1003,7 +1055,7 @@ function BrandPortal({ data }) {
           lineHeight: 1.05, margin: "0 0 1.5rem 0", maxWidth: 760,
         }}>{data.pages.aplicacao?.subtitle || "Regras de uso da marca."}</h2>
         <div style={{ marginBottom: "4rem" }}>
-          <MarkdownContent source={data.pages.aplicacao?.content_md} />
+          <MarkdownContent source={data.pages.aplicacao?.content_md} accentColor={data.accentColor} />
         </div>
 
         <TechSubsection title="Em uso">
@@ -1011,11 +1063,18 @@ function BrandPortal({ data }) {
         </TechSubsection>
 
         <TechSubsection title="Fundos para aplicação">
-          <LogoOnBackgrounds assetGroups={data.assetGroups} />
+          <LogoOnBackgrounds
+            assetGroups={data.assetGroups}
+            logoBackgrounds={data.logoBackgrounds}
+            colorByKey={data.colorByKey}
+          />
         </TechSubsection>
 
         <TechSubsection title="Margem de respiro">
-          <ClearSpace diagramUrl={data.systemAssets?.["Diagrama · Margem de respiro"]} />
+          <ClearSpace
+            diagramUrl={data.systemAssets?.["Diagrama · Margem de respiro"]}
+            text={data.clearSpaceText}
+          />
         </TechSubsection>
 
         <TechSubsection title="Redução mínima">
@@ -1023,11 +1082,11 @@ function BrandPortal({ data }) {
         </TechSubsection>
 
         <TechSubsection title="Usos não permitidos">
-          <DontDoList primaryLogoUrl={data.primaryLogoUrl} />
+          <DontDoList primaryLogoUrl={data.primaryLogoUrl} accentColor={data.accentColor} />
         </TechSubsection>
 
         <TechSubsection title="Selos">
-          <SealList assetGroups={data.assetGroups} />
+          <SealList assetGroups={data.assetGroups} families={data.sealFamilies} />
         </TechSubsection>
       </section>
 
@@ -1061,7 +1120,7 @@ function BrandPortal({ data }) {
           })}
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: "1rem" }}>
-          {visibleGroups.map((g, i) => <AssetCard key={`${g.category}-${g.name}-${i}`} group={g} />)}
+          {visibleGroups.map((g, i) => <AssetCard key={`${g.category}-${g.name}-${i}`} group={g} accentColor={data.accentColor} />)}
         </div>
       </section>
 
