@@ -18,19 +18,34 @@ const HOSTNAME_TO_SLUG = {
   "sevven.monjardim.com": "sevven",
 };
 const DEFAULT_SLUG = "pixxel";
+const KNOWN_SLUGS = ["pixxel", "sevven"];
 
 function detectBrandSlug() {
   if (typeof window === "undefined") return DEFAULT_SLUG;
+
+  // 1. Override via query string: ?brand=sevven (útil pra preview e testes)
   const params = new URLSearchParams(window.location.search);
   const queryOverride = params.get("brand");
   if (queryOverride) return queryOverride;
+
   const hostname = window.location.hostname;
+
+  // 2. Map exato de hostname → slug (domínios de produção)
   if (HOSTNAME_TO_SLUG[hostname]) return HOSTNAME_TO_SLUG[hostname];
-  // Fallback: primeiro subdomínio (útil para previews do Vercel)
+
+  // 3. Domínios temporários do Vercel (pixxel-portal.vercel.app, previews etc.):
+  //    sempre carregam a marca default. Pra testar outra marca, use ?brand=xxx.
+  if (hostname.endsWith(".vercel.app") || hostname === "localhost" || hostname === "127.0.0.1") {
+    return DEFAULT_SLUG;
+  }
+
+  // 4. Fallback: tenta o primeiro subdomínio se for um slug conhecido
+  //    (útil pra subdomínios novos que ainda não foram adicionados ao map acima)
   const parts = hostname.split(".");
-  if (parts.length > 1 && parts[0] && parts[0] !== "www" && parts[0] !== "localhost") {
+  if (parts.length > 1 && KNOWN_SLUGS.includes(parts[0])) {
     return parts[0];
   }
+
   return DEFAULT_SLUG;
 }
 
